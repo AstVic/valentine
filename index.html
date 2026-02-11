@@ -48,7 +48,7 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-// Функция сердца
+// функция сердца
 function heart(t) {
     return {
         x: 16 * Math.sin(t) ** 3,
@@ -56,26 +56,11 @@ function heart(t) {
     };
 }
 
-// Главное сердце
-function drawHeart() {
-    const scale = Math.min(canvas.width, canvas.height) / 40;
-    ctx.save();
-    ctx.translate(canvas.width/2, canvas.height/2);
-    ctx.fillStyle = "#ff4d6d";
-    ctx.beginPath();
-    for(let t=0; t<Math.PI*2; t+=0.01){
-        const {x,y} = heart(t);
-        ctx.lineTo(x*scale, -y*scale);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-}
-
-// Маленькие вылетающие сердечки
+// массив для маленьких сердечек
 let smallHearts = [];
 const startTime = Date.now();
 
+// создаем маленькое сердце
 function spawnSmallHeart() {
     const now = Date.now();
     if(now - startTime < 5000){ // только первые 5 секунд
@@ -92,15 +77,24 @@ function spawnSmallHeart() {
     }
 }
 
-// Анимация
-function draw() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+// отрисовка большого сердца
+function drawBigHeart() {
+    const scale = Math.min(canvas.width, canvas.height) / 40;
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height/2);
+    ctx.fillStyle = "#ff4d6d";
+    ctx.beginPath();
+    for(let t=0; t<Math.PI*2; t+=0.01){
+        const {x,y} = heart(t);
+        ctx.lineTo(x*scale, -y*scale);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+}
 
-    drawHeart(); // сплошное сердце
-
-    spawnSmallHeart();
-
-    // рисуем маленькие сердечки
+// отрисовка маленьких сердечек
+function drawSmallHearts() {
     smallHearts.forEach((h, i)=>{
         ctx.fillStyle = h.color;
         ctx.beginPath();
@@ -109,7 +103,7 @@ function draw() {
         ctx.bezierCurveTo(h.x + h.size*2, h.y + h.size/3, h.x + h.size, h.y - h.size*1.5, h.x, h.y - h.size/2);
         ctx.fill();
 
-        // движение
+        // движение сердечек
         h.x += h.vx;
         h.y += h.vy;
         h.vy += 0.02; // легкая гравитация
@@ -119,6 +113,15 @@ function draw() {
             smallHearts.splice(i,1);
         }
     });
+}
+
+// главный цикл анимации
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawBigHeart(); // сплошное сердце
+    spawnSmallHeart();
+    drawSmallHearts();
 
     requestAnimationFrame(draw);
 }
