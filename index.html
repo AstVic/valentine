@@ -14,6 +14,13 @@
     height: 100%;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
+
+  #stage {
+    position: fixed;
+    inset: 0;
+    will-change: transform;
+  }
+
   canvas { display: block; }
 
   .text {
@@ -27,6 +34,7 @@
     user-select: none;
     text-shadow: 0 0 12px rgba(255, 77, 109, 0.8);
     pointer-events: none;
+    z-index: 5;
   }
 
   .start {
@@ -36,7 +44,9 @@
     place-items: center;
     background: rgba(255,255,255,0.75);
     backdrop-filter: blur(6px);
+    z-index: 10;
   }
+
   .start button {
     border: none;
     border-radius: 999px;
@@ -48,10 +58,27 @@
     box-shadow: 0 10px 30px rgba(255, 77, 109, 0.35);
   }
 
-  #stage {
+  #flyVideo {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 40px;
+    height: 40px;
+    transform: translate(-50%, -50%);
+    transform-origin: center center;
+    z-index: 6;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Flash overlay */
+  #flash {
     position: fixed;
     inset: 0;
-    will-change: transform;
+    background: white;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 20;
   }
 </style>
 </head>
@@ -65,12 +92,20 @@
   </div>
 
   <canvas id="canvas"></canvas>
+
+  <video id="flyVideo" playsinline muted loop preload="auto">
+    <source src="./sticker.webm" type="video/webm">
+  </video>
 </div>
+
+<div id="flash"></div>
 
 <script>
 const stage = document.getElementById("stage");
+const flash = document.getElementById("flash");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+const flyVideo = document.getElementById("flyVideo");
 
 function resize() {
   canvas.width = window.innerWidth;
@@ -79,7 +114,7 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-// сердце (кривая)
+// сердце
 function heart(t) {
   return {
     x: 16 * Math.sin(t) ** 3,
@@ -87,7 +122,6 @@ function heart(t) {
   };
 }
 
-// большое сердце (заливка)
 function drawBigHeart() {
   const pulse = 1 + Math.sin(performance.now() * 0.002) * 0.04;
   const scale = Math.min(canvas.width, canvas.height) / 40 * pulse;
@@ -105,11 +139,10 @@ function drawBigHeart() {
   ctx.restore();
 }
 
-// маленькие сердечки (первые 5 секунд)
+// маленькие сердечки (3 сек)
 let smallHearts = [];
 function spawnSmallHeart(startMs) {
-  const now = performance.now();
-  if (now - startMs < 5000) {
+  if (performance.now() - startMs < 3000) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 1.2 + Math.random() * 2.0;
     smallHearts.push({
@@ -144,83 +177,97 @@ function drawSmallHearts() {
   }
 }
 
-// ✅ ВАЖНО: файлы в корне репозитория → используем относительные пути
-const WEBM_URL   = "./sticker.webm";
-const AUDIO_URL  = "./mobileringtone.online_never-gonna-give-you-up.mp3";
-
-// Видео webm (loop)
-const video = document.createElement("video");
-video.src = WEBM_URL;
-video.loop = true;
-video.muted = true;        // чтобы браузер не ругался
-video.playsInline = true;
-video.preload = "auto";
-
-// Один звук (loop)
-const audio = new Audio(AUDIO_URL);
-audio.preload = "auto";
+// звук
+const audio = new Audio("./mobileringtone.online_never-gonna-give-you-up.mp3");
 audio.loop = true;
 
-// громкости: тихо первые 5 секунд, затем x3
-const QUIET_VOL = 0.2;
-const LOUD_VOL  = Math.min(1, QUIET_VOL * 3);
+const QUIET_VOL = 0.03; // супер тихо
+const LOUD_VOL  = 0.95; // супер громко
 
-// webm-анимация: вылет вверх без вращения, быстрый рост до targetSize
+// тряска
+let shakeMode = "off"; // off | hit | on
+let hitUntil = 0;
+
+function applyShake() {
+  if (shakeMode === "off") {
+    stage.style.transform = "translate(0px, 0px)";
+    return;
+  }
+
+  // HIT — мощный удар, потом обычная бесконечная
+  const k = (shakeMode === "hit") ? 26 : 12;
+
+  const dx = (Math.random() * 2 - 1) * k;
+  const dy = (Math.random() * 2 - 1) * k;
+  stage.style.transform = `translate(${dx}px, ${dy}px)`;
+
+  if (shakeMode === "hit" && performance.now() >= hitUntil) {
+    shakeMode = "on";
+  }
+}
+
+// flash
+function doFlash() {
+  flash.style.opacity = "1";
+  setTimeout(() => { flash.style.opacity = "0"; }, 120);
+}
+
+// видео: вылет вверх + рост
 let videoAnim = null;
-function startWebmFlight() {
-  const targetSize = Math.min(canvas.width, canvas.height) * 0.55;
+
+function startVideoFlight() {
+  flyVideo.style.opacity = "1";
+
+  const targetPx = Math.min(canvas.width, canvas.height) * 0.6;
+
   videoAnim = {
     x: canvas.width / 2,
     y: canvas.height / 2,
-    vy: -14,
-    size: 30,
-    targetSize,
-    growth: 1.12
+    vy: -18,
+    size: 40,
+    target: targetPx,
+    growth: 1.16
   };
 }
 
-function drawWebm() {
+function updateVideoFlight() {
   if (!videoAnim) return;
-
-  // если видео ещё не готово — просто подождём (иначе drawImage рисует "ничего")
-  if (video.readyState < 2) return;
-
-  const s = videoAnim.size;
-  ctx.drawImage(video, videoAnim.x - s/2, videoAnim.y - s/2, s, s);
 
   videoAnim.y += videoAnim.vy;
 
-  if (videoAnim.size < videoAnim.targetSize) {
-    videoAnim.size = Math.min(videoAnim.targetSize, videoAnim.size * videoAnim.growth);
+  if (videoAnim.size < videoAnim.target) {
+    videoAnim.size = Math.min(videoAnim.target, videoAnim.size * videoAnim.growth);
   } else {
-    videoAnim.vy *= 0.92;
+    videoAnim.vy *= 0.9;
     if (Math.abs(videoAnim.vy) < 0.2) videoAnim.vy = 0;
   }
+
+  flyVideo.style.width = `${videoAnim.size}px`;
+  flyVideo.style.height = `${videoAnim.size}px`;
+  flyVideo.style.left = `${videoAnim.x}px`;
+  flyVideo.style.top  = `${videoAnim.y}px`;
 }
 
-// Тряска
-let shakeUntil = 0;
-function startShake(ms) {
-  shakeUntil = performance.now() + ms;
-}
-function applyShake() {
-  if (performance.now() < shakeUntil) {
-    const k = 10;
-    const dx = (Math.random() * 2 - 1) * k;
-    const dy = (Math.random() * 2 - 1) * k;
-    stage.style.transform = `translate(${dx}px, ${dy}px)`;
-  } else {
-    stage.style.transform = "translate(0px, 0px)";
-  }
+// micro-freeze (stop-frame)
+let freezeUntil = 0;
+function doFreeze(ms) {
+  freezeUntil = performance.now() + ms;
 }
 
-// LOOP
+// loop
 let startMs = null;
 let running = false;
-let switched = false;
+let dropped = false;
 
 function tick() {
   if (!running) return;
+
+  // micro-freeze: не обновляем сцену, но тряску и flash можно оставить
+  if (performance.now() < freezeUntil) {
+    applyShake();
+    requestAnimationFrame(tick);
+    return;
+  }
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -230,21 +277,26 @@ function tick() {
 
   const elapsed = performance.now() - startMs;
 
-  // через 5 секунд: громче + запуск webm + тряска
-  if (!switched && elapsed >= 5000) {
-    switched = true;
-    audio.volume = LOUD_VOL;
-    startWebmFlight();
-    startShake(900);
+  if (!dropped && elapsed >= 3000) {
+    dropped = true;
+
+    // BASS DROP
+    audio.volume = LOUD_VOL;   // резкий скачок громкости
+    doFlash();                 // flash
+    doFreeze(90);              // микрозаморозка кадра
+
+    shakeMode = "hit";         // сильная тряска
+    hitUntil = performance.now() + 180;
+
+    startVideoFlight();
   }
 
-  drawWebm();
+  updateVideoFlight();
   applyShake();
 
   requestAnimationFrame(tick);
 }
 
-// запуск по клику
 document.getElementById("startBtn").addEventListener("click", async () => {
   document.getElementById("startOverlay").style.display = "none";
 
@@ -252,9 +304,8 @@ document.getElementById("startBtn").addEventListener("click", async () => {
   running = true;
 
   audio.volume = QUIET_VOL;
-
-  try { await audio.play(); } catch (e) { console.log("audio.play blocked:", e); }
-  try { await video.play(); } catch (e) { console.log("video.play blocked:", e); }
+  await audio.play().catch(()=>{});
+  await flyVideo.play().catch(()=>{});
 
   tick();
 });
