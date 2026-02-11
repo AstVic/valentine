@@ -1,132 +1,261 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
 <title>ананас❤️</title>
 
 <style>
-    html, body {
-        margin: 0;
-        padding: 0;
-        background: white;
-        overflow: hidden;
-        height: 100%;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: white;
+    overflow: hidden;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  canvas { display: block; }
 
-    canvas {
-        display: block;
-    }
+  .text {
+    position: absolute;
+    top: 8%;
+    width: 100%;
+    text-align: center;
+    font-size: clamp(28px, 6vw, 48px);
+    color: #ff4d6d;
+    letter-spacing: 1px;
+    user-select: none;
+    text-shadow: 0 0 12px rgba(255, 77, 109, 0.8);
+    pointer-events: none;
+  }
 
-    .text {
-        position: absolute;
-        top: 8%;
-        width: 100%;
-        text-align: center;
-        font-size: clamp(28px, 6vw, 48px);
-        color: #ff4d6d;
-        letter-spacing: 1px;
-        user-select: none;
-        text-shadow: 0 0 12px rgba(255, 77, 109, 0.8);
-    }
+  .start {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(255,255,255,0.75);
+    backdrop-filter: blur(6px);
+  }
+  .start button {
+    border: none;
+    border-radius: 999px;
+    padding: 14px 18px;
+    font-size: 18px;
+    cursor: pointer;
+    background: #ff4d6d;
+    color: white;
+    box-shadow: 0 10px 30px rgba(255, 77, 109, 0.35);
+  }
+
+  /* Контейнер для "тряски" всей сцены */
+  #stage {
+    position: fixed;
+    inset: 0;
+    will-change: transform;
+  }
 </style>
 </head>
 
 <body>
-<div class="text">ананас❤️</div>
-<canvas id="canvas"></canvas>
+<div id="stage">
+  <div class="text">ананас❤️</div>
+  <div class="start" id="startOverlay">
+    <button id="startBtn">Нажми, чтобы начать ❤️</button>
+  </div>
+  <canvas id="canvas"></canvas>
+</div>
 
 <script>
+const stage = document.getElementById("stage");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
 function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
 window.addEventListener("resize", resize);
 resize();
 
-// функция сердца
+// сердце (кривая)
 function heart(t) {
-    return {
-        x: 16 * Math.sin(t) ** 3,
-        y: 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)
-    };
+  return {
+    x: 16 * Math.sin(t) ** 3,
+    y: 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)
+  };
 }
 
-// массив для маленьких сердечек
-let smallHearts = [];
-const startTime = Date.now();
-
-// создаем маленькое сердце
-function spawnSmallHeart() {
-    const now = Date.now();
-    if(now - startTime < 5000){ // только первые 5 секунд
-        const angle = Math.random() * 2 * Math.PI;
-        const speed = 1 + Math.random()*2;
-        smallHearts.push({
-            x: canvas.width/2,
-            y: canvas.height/2,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            size: 5 + Math.random()*3,
-            color: `hsl(${Math.random()*360}, 100%, 65%)`
-        });
-    }
-}
-
-// отрисовка большого сердца
+// большое сердце (заливка)
 function drawBigHeart() {
-    const scale = Math.min(canvas.width, canvas.height) / 40;
-    ctx.save();
-    ctx.translate(canvas.width/2, canvas.height/2);
-    ctx.fillStyle = "#ff4d6d";
-    ctx.beginPath();
-    for(let t=0; t<Math.PI*2; t+=0.01){
-        const {x,y} = heart(t);
-        ctx.lineTo(x*scale, -y*scale);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+  const pulse = 1 + Math.sin(performance.now() * 0.002) * 0.04;
+  const scale = Math.min(canvas.width, canvas.height) / 40 * pulse;
+
+  ctx.save();
+  ctx.translate(canvas.width/2, canvas.height/2);
+  ctx.fillStyle = "#ff4d6d";
+  ctx.beginPath();
+  for (let t = 0; t < Math.PI * 2; t += 0.01) {
+    const { x, y } = heart(t);
+    ctx.lineTo(x * scale, -y * scale);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
-// отрисовка маленьких сердечек
-function drawSmallHearts() {
-    smallHearts.forEach((h, i)=>{
-        ctx.fillStyle = h.color;
-        ctx.beginPath();
-        ctx.moveTo(h.x, h.y - h.size/2);
-        ctx.bezierCurveTo(h.x - h.size, h.y - h.size*1.5, h.x - h.size*2, h.y + h.size/3, h.x, h.y + h.size);
-        ctx.bezierCurveTo(h.x + h.size*2, h.y + h.size/3, h.x + h.size, h.y - h.size*1.5, h.x, h.y - h.size/2);
-        ctx.fill();
-
-        // движение сердечек
-        h.x += h.vx;
-        h.y += h.vy;
-        h.vy += 0.02; // легкая гравитация
-
-        // удаляем сердечки за пределами экрана
-        if(h.y - h.size > canvas.height || h.x - h.size > canvas.width || h.x + h.size < 0){
-            smallHearts.splice(i,1);
-        }
+// маленькие сердечки (первые 5 секунд)
+let smallHearts = [];
+function spawnSmallHeart(startMs) {
+  const now = performance.now();
+  if (now - startMs < 5000) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1.2 + Math.random() * 2.0;
+    smallHearts.push({
+      x: canvas.width / 2,
+      y: canvas.height / 2,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 5 + Math.random() * 3,
+      color: `hsl(${Math.random() * 360}, 100%, 65%)`
     });
+  }
+}
+function drawSmallHearts() {
+  for (let i = smallHearts.length - 1; i >= 0; i--) {
+    const h = smallHearts[i];
+    ctx.fillStyle = h.color;
+
+    ctx.beginPath();
+    ctx.moveTo(h.x, h.y - h.size/2);
+    ctx.bezierCurveTo(h.x - h.size, h.y - h.size*1.5, h.x - h.size*2, h.y + h.size/3, h.x, h.y + h.size);
+    ctx.bezierCurveTo(h.x + h.size*2, h.y + h.size/3, h.x + h.size, h.y - h.size*1.5, h.x, h.y - h.size/2);
+    ctx.fill();
+
+    h.x += h.vx;
+    h.y += h.vy;
+    h.vy += 0.02;
+
+    if (h.y - h.size > canvas.height || h.x + h.size < 0 || h.x - h.size > canvas.width) {
+      smallHearts.splice(i, 1);
+    }
+  }
 }
 
-// главный цикл анимации
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+// ====== MEDIA (твои raw-ссылки) ======
+const WEBM_URL  = "https://raw.githubusercontent.com/AstVic/valentine/blob/3bf3223fcd51794304a6453ecffc252e1f95bb63/sticker.webm";
+const AUDIO2_URL = "https://raw.githubusercontent.com/AstVic/valentine/0891bdfeff81e4aecf2c6525f0c3f0138183840c/mobileringtone.online_never-gonna-give-you-up.mp3";
 
-    drawBigHeart(); // сплошное сердце
-    spawnSmallHeart();
-    drawSmallHearts();
+// Видео webm (loop)
+const video = document.createElement("video");
+video.src = WEBM_URL;
+video.loop = true;
+video.muted = true;
+video.playsInline = true;
+video.preload = "auto";
 
-    requestAnimationFrame(draw);
+// Один звук (loop)
+const audio = new Audio(AUDIO2_URL);
+audio.preload = "auto";
+audio.loop = true;
+
+// громкости: тихо первые 5 секунд, затем x3
+const QUIET_VOL = 0.2;
+const LOUD_VOL  = Math.min(1, QUIET_VOL * 3); // безопасно не выше 1.0
+
+// webm-анимация: вылет вверх без вращения, быстрый рост до targetSize
+let videoAnim = null;
+function startWebmFlight() {
+  const targetSize = Math.min(canvas.width, canvas.height) * 0.55;
+  videoAnim = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    vy: -14,
+    size: 30,
+    targetSize,
+    growth: 1.12
+  };
+}
+function drawWebm() {
+  if (!videoAnim) return;
+
+  const s = videoAnim.size;
+  ctx.drawImage(video, videoAnim.x - s/2, videoAnim.y - s/2, s, s);
+
+  videoAnim.y += videoAnim.vy;
+
+  if (videoAnim.size < videoAnim.targetSize) {
+    videoAnim.size = Math.min(videoAnim.targetSize, videoAnim.size * videoAnim.growth);
+  } else {
+    videoAnim.vy *= 0.92;
+    if (Math.abs(videoAnim.vy) < 0.2) videoAnim.vy = 0;
+  }
 }
 
-draw();
+// ====== ТРЯСКА ======
+let shakeUntil = 0;
+function startShake(ms) {
+  shakeUntil = performance.now() + ms;
+}
+function applyShake() {
+  if (performance.now() < shakeUntil) {
+    // лёгкая дрожь: 0..1 -> -1..1
+    const k = 10; // интенсивность (можешь сделать 6-18)
+    const dx = (Math.random() * 2 - 1) * k;
+    const dy = (Math.random() * 2 - 1) * k;
+    stage.style.transform = `translate(${dx}px, ${dy}px)`;
+  } else {
+    stage.style.transform = "translate(0px, 0px)";
+  }
+}
+
+// ====== LOOP ======
+let startMs = null;
+let running = false;
+let switched = false;
+
+function tick() {
+  if (!running) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawBigHeart();
+  spawnSmallHeart(startMs);
+  drawSmallHearts();
+
+  const elapsed = performance.now() - startMs;
+
+  // через 5 секунд: громче + запуск webm + тряска
+  if (!switched && elapsed >= 5000) {
+    switched = true;
+
+    audio.volume = LOUD_VOL;  // громче в 3 раза
+    startWebmFlight();
+    startShake(900);          // тряска ~0.9 сек (можно 1500)
+  }
+
+  drawWebm();
+  applyShake();
+
+  requestAnimationFrame(tick);
+}
+
+// запуск по клику (важно для autoplay)
+document.getElementById("startBtn").addEventListener("click", async () => {
+  document.getElementById("startOverlay").style.display = "none";
+
+  startMs = performance.now();
+  running = true;
+
+  // стартуем звук тихо
+  audio.volume = QUIET_VOL;
+  try { await audio.play(); } catch(e) {}
+
+  // стартуем webm (оно будет рисоваться после 5 сек, но пусть уже играет в фоне)
+  try { await video.play(); } catch(e) {}
+
+  tick();
+});
 </script>
 </body>
 </html>
