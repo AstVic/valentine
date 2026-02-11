@@ -218,34 +218,37 @@ let videoAnim = null;
 function startVideoFlight() {
   flyVideo.style.opacity = "1";
 
-  const targetPx = Math.min(canvas.width, canvas.height) * 0.6;
+  const targetSize = Math.min(canvas.width, canvas.height) * 0.6;
 
   videoAnim = {
     x: canvas.width / 2,
     y: canvas.height / 2,
-    vy: -18,
     size: 40,
-    target: targetPx,
-    growth: 1.16
+    target: targetSize,
+    growth: 1.18,
+    settled: false
   };
 }
 
 function updateVideoFlight() {
   if (!videoAnim) return;
 
-  videoAnim.y += videoAnim.vy;
-
+  // увеличиваем размер
   if (videoAnim.size < videoAnim.target) {
-    videoAnim.size = Math.min(videoAnim.target, videoAnim.size * videoAnim.growth);
+    videoAnim.size = Math.min(
+      videoAnim.target,
+      videoAnim.size * videoAnim.growth
+    );
   } else {
-    videoAnim.vy *= 0.9;
-    if (Math.abs(videoAnim.vy) < 0.2) videoAnim.vy = 0;
+    videoAnim.settled = true;
   }
 
+  // всегда фиксируем строго в центре
+  flyVideo.style.left = "50%";
+  flyVideo.style.top = "50%";
   flyVideo.style.width = `${videoAnim.size}px`;
   flyVideo.style.height = `${videoAnim.size}px`;
-  flyVideo.style.left = `${videoAnim.x}px`;
-  flyVideo.style.top  = `${videoAnim.y}px`;
+  flyVideo.style.transform = "translate(-50%, -50%)";
 }
 
 // micro-freeze (stop-frame)
